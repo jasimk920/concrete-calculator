@@ -20,6 +20,11 @@ jobs:
         with:
           channel: stable
 
+      - name: Move our code to the right place
+        run: |
+          mkdir -p lib
+          cp -r .github/workflows/lib/. lib/
+
       - name: Create Android files (keeping our own code)
         run: |
           cp -r lib /tmp/lib_backup
