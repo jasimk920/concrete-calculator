@@ -1,0 +1,43 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Create Android files (keeping our own code)
+        run: |
+          cp -r lib /tmp/lib_backup
+          cp pubspec.yaml /tmp/pubspec_backup.yaml
+          flutter create --platforms=android --project-name concrete_calculator .
+          rm -rf lib
+          cp -r /tmp/lib_backup lib
+          cp /tmp/pubspec_backup.yaml pubspec.yaml
+
+      - name: Add AdMob TEST app ID
+        run: |
+          sed -i 's#</application>#    <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713"/>\n    </application>#' android/app/src/main/AndroidManifest.xml
+
+      - run: flutter pub get
+
+      - run: flutter build apk --release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: concrete-calculator-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
