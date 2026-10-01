@@ -28,6 +28,54 @@ class ConcreteApp extends StatelessWidget {
 
 enum Shape { slab, column }
 
+/// One concrete mix: ratio of cement : sand : aggregate.
+class MixDesign {
+  final String label;
+  final double cement;
+  final double sand;
+  final double aggregate;
+  const MixDesign(this.label, this.cement, this.sand, this.aggregate);
+
+  String get ratio =>
+      '${_part(cement)} : ${_part(sand)} : ${_part(aggregate)}';
+
+  static String _part(double v) =>
+      v == v.roundToDouble() ? v.toInt().toString() : v.toString();
+}
+
+const List<MixDesign> mixDesigns = [
+  MixDesign('M15', 1, 2, 4),
+  MixDesign('M20', 1, 1.5, 3),
+  MixDesign('M25', 1, 1, 2),
+];
+
+/// Rough site-mix material quantities for a given volume of concrete.
+class MaterialEstimate {
+  final double cementBags;
+  final double sandM3;
+  final double aggregateM3;
+
+  const MaterialEstimate({
+    required this.cementBags,
+    required this.sandM3,
+    required this.aggregateM3,
+  });
+
+  factory MaterialEstimate.from(double concreteM3, MixDesign mix) {
+    // Dry volume of materials needed for 1 m3 of wet concrete.
+    const double dryFactor = 1.54;
+    // Volume of one 50 kg cement bag (cement density about 1440 kg/m3).
+    const double bagM3 = 50 / 1440;
+    final double parts = mix.cement + mix.sand + mix.aggregate;
+    final double dryM3 = concreteM3 * dryFactor;
+    return MaterialEstimate(
+      cementBags: dryM3 * mix.cement / parts / bagM3,
+      sandM3: dryM3 * mix.sand / parts,
+      aggregateM3: dryM3 * mix.aggregate / parts,
+    );
+  }
+}
+
 class CalculatorPage extends StatefulWidget {
   const CalculatorPage({super.key});
 
@@ -38,6 +86,7 @@ class CalculatorPage extends StatefulWidget {
 class _CalculatorPageState extends State<CalculatorPage> {
   UnitSystem unit = UnitSystem.metric;
   Shape shape = Shape.slab;
+  int mixIndex = 1; // M20 by default
 
   final length = TextEditingController();
   final width = TextEditingController();
@@ -129,6 +178,36 @@ class _CalculatorPageState extends State<CalculatorPage> {
     );
   }
 
+  String _vol(double m3) =>
+      '${m3.toStringAsFixed(2)} m³  (${(m3 * 35.3147).toStringAsFixed(1)} ft³)';
+
+  Widget _materialsSection(BuildContext context, double concreteM3) {
+    final mix = mixDesigns[mixIndex];
+    final est = MaterialEstimate.from(concreteM3, mix);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Materials for site-mixed concrete',
+            style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        SegmentedButton<int>(
+          segments: [
+            for (int i = 0; i < mixDesigns.length; i++)
+              ButtonSegment(value: i, label: Text(mixDesigns[i].label)),
+          ],
+          selected: {mixIndex},
+          onSelectionChanged: (s) => setState(() => mixIndex = s.first),
+        ),
+        const SizedBox(height: 8),
+        Text('Mix ratio (cement : sand : aggregate) = ${mix.ratio}'),
+        const SizedBox(height: 8),
+        Text('Cement: ${est.cementBags.ceil()} bags (50 kg each)'),
+        Text('Sand: ${_vol(est.sandM3)}'),
+        Text('Aggregate (gitti): ${_vol(est.aggregateM3)}'),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bags = metric ? metricBags : imperialBags;
@@ -215,10 +294,14 @@ class _CalculatorPageState extends State<CalculatorPage> {
                     const SizedBox(height: 8),
                     for (final b in bags)
                       Text('${b.label}: ${b.bagsFor(result!.m3)} bags'),
+                    const Divider(height: 28),
+                    _materialsSection(context, result!.m3),
                     const SizedBox(height: 12),
                     Text(
-                      'Estimates only. Bag yields vary by brand, so check the '
-                      'label and confirm quantities with your supplier.',
+                      'Estimates only. Quantities change with material quality '
+                      'and site conditions. Steel (saria), shuttering and labour '
+                      'are not included. Please confirm with your engineer or '
+                      'mason.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
