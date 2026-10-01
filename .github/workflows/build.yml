@@ -34,6 +34,33 @@ jobs:
           cp -r /tmp/lib_backup lib
           cp /tmp/pubspec_backup.yaml pubspec.yaml
 
+      - name: Set app name and icon
+        run: |
+          sed -i 's/android:label="[^"]*"/android:label="ConcreteMate"/' android/app/src/main/AndroidManifest.xml
+          python3 -c "import PIL" 2>/dev/null || pip install --break-system-packages pillow
+          python3 - <<'PY'
+          from PIL import Image, ImageDraw
+
+          S = 1024
+          img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+          d = ImageDraw.Draw(img)
+          d.rounded_rectangle([0, 0, S - 1, S - 1], radius=int(S * 0.22), fill=(38, 50, 56, 255))
+
+          cx, cy = S // 2, 437
+          w, h, t = 300, 170, 150
+          top = [(cx, cy - h), (cx + w, cy), (cx, cy + h), (cx - w, cy)]
+          left = [(cx - w, cy), (cx, cy + h), (cx, cy + h + t), (cx - w, cy + t)]
+          right = [(cx + w, cy), (cx, cy + h), (cx, cy + h + t), (cx + w, cy + t)]
+          d.polygon(left, fill=(176, 190, 197, 255))
+          d.polygon(right, fill=(120, 144, 156, 255))
+          d.polygon(top, fill=(236, 239, 241, 255))
+
+          sizes = {"mdpi": 48, "hdpi": 72, "xhdpi": 96, "xxhdpi": 144, "xxxhdpi": 192}
+          for name, px in sizes.items():
+              out = img.resize((px, px), Image.LANCZOS)
+              out.save(f"android/app/src/main/res/mipmap-{name}/ic_launcher.png")
+          PY
+
       - name: Add AdMob TEST app ID
         run: |
           sed -i 's#</application>#    <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713"/>\n    </application>#' android/app/src/main/AndroidManifest.xml
